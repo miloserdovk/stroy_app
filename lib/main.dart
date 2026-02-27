@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import 'models.dart';
 
 const String _defaultManagerId = 'u-manager-1';
+const List<String> _knownSiteIds = ['wh-a', 'site-17', 'site-19'];
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -162,54 +163,102 @@ class InventoryTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<ItemCategory?>(
-                  value: state.categoryFilter,
-                  decoration: const InputDecoration(
-                    labelText: 'Category',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem<ItemCategory?>(
-                      value: null,
-                      child: Text('All categories'),
-                    ),
-                    ...ItemCategory.values.map(
-                      (category) => DropdownMenuItem<ItemCategory?>(
-                        value: category,
-                        child: Text(_categoryLabel(category)),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final singleColumn = constraints.maxWidth < 720;
+              final fieldWidth = singleColumn
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 24) / 3;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<ItemCategory?>(
+                      value: state.categoryFilter,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
                       ),
+                      items: [
+                        const DropdownMenuItem<ItemCategory?>(
+                          value: null,
+                          child: Text('All categories'),
+                        ),
+                        ...ItemCategory.values.map(
+                          (category) => DropdownMenuItem<ItemCategory?>(
+                            value: category,
+                            child: Text(_categoryLabel(category)),
+                          ),
+                        ),
+                      ],
+                      onChanged: notifier.updateCategoryFilter,
                     ),
-                  ],
-                  onChanged: notifier.updateCategoryFilter,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonFormField<ItemCondition?>(
-                  value: state.conditionFilter,
-                  decoration: const InputDecoration(
-                    labelText: 'Condition',
-                    border: OutlineInputBorder(),
                   ),
-                  items: [
-                    const DropdownMenuItem<ItemCondition?>(
-                      value: null,
-                      child: Text('All conditions'),
-                    ),
-                    ...ItemCondition.values.map(
-                      (condition) => DropdownMenuItem<ItemCondition?>(
-                        value: condition,
-                        child: Text(_conditionLabel(condition)),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<ItemCondition?>(
+                      value: state.conditionFilter,
+                      decoration: const InputDecoration(
+                        labelText: 'Condition',
+                        border: OutlineInputBorder(),
                       ),
+                      items: [
+                        const DropdownMenuItem<ItemCondition?>(
+                          value: null,
+                          child: Text('All conditions'),
+                        ),
+                        ...ItemCondition.values.map(
+                          (condition) => DropdownMenuItem<ItemCondition?>(
+                            value: condition,
+                            child: Text(_conditionLabel(condition)),
+                          ),
+                        ),
+                      ],
+                      onChanged: notifier.updateConditionFilter,
                     ),
-                  ],
-                  onChanged: notifier.updateConditionFilter,
-                ),
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<String?>(
+                      value: state.siteFilter,
+                      decoration: const InputDecoration(
+                        labelText: 'Site',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All sites'),
+                        ),
+                        ...state.siteIds.map(
+                          (siteId) => DropdownMenuItem<String?>(
+                            value: siteId,
+                            child: Text(_siteLabel(siteId)),
+                          ),
+                        ),
+                      ],
+                      onChanged: notifier.updateSiteFilter,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: () => _showAddItemDialog(
+                context: context,
+                ref: ref,
+                siteIds: state.siteIds,
               ),
-            ],
+              icon: const Icon(Icons.add),
+              label: const Text('Add item'),
+            ),
           ),
           const SizedBox(height: 12),
           InventorySummary(state: state),
@@ -264,16 +313,35 @@ class InventoryTab extends ConsumerWidget {
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: item.holderId == null
-                                    ? FilledButton.tonal(
-                                        onPressed: state.workers.isEmpty
-                                            ? null
-                                            : () => _showCheckoutDialog(
-                                                  context: context,
-                                                  ref: ref,
-                                                  item: item,
-                                                  workers: state.workers,
-                                                ),
-                                        child: const Text('Check out'),
+                                    ? Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        alignment: WrapAlignment.end,
+                                        children: [
+                                          FilledButton.tonal(
+                                            onPressed: state.workers.isEmpty
+                                                ? null
+                                                : () => _showCheckoutDialog(
+                                                      context: context,
+                                                      ref: ref,
+                                                      item: item,
+                                                      workers: state.workers,
+                                                    ),
+                                            child: const Text('Check out'),
+                                          ),
+                                          OutlinedButton.icon(
+                                            onPressed: state.siteIds.length < 2
+                                                ? null
+                                                : () => _showTransferDialog(
+                                                      context: context,
+                                                      ref: ref,
+                                                      item: item,
+                                                      siteIds: state.siteIds,
+                                                    ),
+                                            icon: const Icon(Icons.swap_horiz),
+                                            label: const Text('Transfer'),
+                                          ),
+                                        ],
                                       )
                                     : OutlinedButton(
                                         onPressed: () => _showReturnDialog(
@@ -444,6 +512,7 @@ class TransactionsTab extends ConsumerWidget {
         final itemName = itemById[transaction.itemId]?.name ?? transaction.itemId;
         final actorName = state.usersById[transaction.userId]?.name ??
             transaction.userId;
+        final details = _transactionDetails(transaction);
 
         return Card(
           child: ListTile(
@@ -453,8 +522,11 @@ class TransactionsTab extends ConsumerWidget {
             ),
             title: Text('${_transactionLabel(transaction.type)}: $itemName'),
             subtitle: Text(
-              '$actorName | ${dateFormat.format(transaction.timestamp)}',
+              details == null
+                  ? '$actorName | ${dateFormat.format(transaction.timestamp)}'
+                  : '$actorName | ${dateFormat.format(transaction.timestamp)}\n$details',
             ),
+            isThreeLine: details != null,
             trailing: Text(_conditionLabel(transaction.condition)),
           ),
         );
@@ -589,6 +661,246 @@ Future<void> _showReturnDialog({
       );
 }
 
+Future<void> _showTransferDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  required InventoryItem item,
+  required List<String> siteIds,
+}) async {
+  final targetSiteIds =
+      siteIds.where((siteId) => siteId != item.siteId).toList(growable: false);
+  if (targetSiteIds.isEmpty) {
+    return;
+  }
+
+  var selectedSiteId = targetSiteIds.first;
+
+  final pickedSite = await showDialog<String>(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Text('Transfer: ${item.name}'),
+            content: DropdownButtonFormField<String>(
+              value: selectedSiteId,
+              decoration: const InputDecoration(
+                labelText: 'Target site',
+                border: OutlineInputBorder(),
+              ),
+              items: targetSiteIds
+                  .map(
+                    (siteId) => DropdownMenuItem<String>(
+                      value: siteId,
+                      child: Text(_siteLabel(siteId)),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    selectedSiteId = value;
+                  });
+                }
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(selectedSiteId),
+                child: const Text('Confirm'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  if (pickedSite == null) {
+    return;
+  }
+
+  ref.read(inventoryControllerProvider.notifier).transferItem(
+        itemId: item.id,
+        targetSiteId: pickedSite,
+        processedBy: _defaultManagerId,
+      );
+}
+
+Future<void> _showAddItemDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  required List<String> siteIds,
+}) async {
+  final nameController = TextEditingController();
+  var selectedCategory = ItemCategory.tool;
+  var selectedCondition = ItemCondition.newOne;
+  var selectedSiteId = siteIds.isEmpty ? _knownSiteIds.first : siteIds.first;
+  var shouldShowValidation = false;
+
+  final result = await showDialog<_AddItemInput>(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Add inventory item'),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: 'Name',
+                        border: const OutlineInputBorder(),
+                        errorText: shouldShowValidation &&
+                                nameController.text.trim().isEmpty
+                            ? 'Name is required'
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<ItemCategory>(
+                      value: selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: ItemCategory.values
+                          .map(
+                            (category) => DropdownMenuItem<ItemCategory>(
+                              value: category,
+                              child: Text(_categoryLabel(category)),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedCategory = value;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<ItemCondition>(
+                      value: selectedCondition,
+                      decoration: const InputDecoration(
+                        labelText: 'Condition',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: ItemCondition.values
+                          .map(
+                            (condition) => DropdownMenuItem<ItemCondition>(
+                              value: condition,
+                              child: Text(_conditionLabel(condition)),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedCondition = value;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedSiteId,
+                      decoration: const InputDecoration(
+                        labelText: 'Site',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _knownSiteIds
+                          .map(
+                            (siteId) => DropdownMenuItem<String>(
+                              value: siteId,
+                              child: Text(_siteLabel(siteId)),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedSiteId = value;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final itemName = nameController.text.trim();
+                  if (itemName.isEmpty) {
+                    setState(() {
+                      shouldShowValidation = true;
+                    });
+                    return;
+                  }
+
+                  Navigator.of(context).pop(
+                    _AddItemInput(
+                      name: itemName,
+                      category: selectedCategory,
+                      condition: selectedCondition,
+                      siteId: selectedSiteId,
+                    ),
+                  );
+                },
+                child: const Text('Add'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  nameController.dispose();
+
+  if (result == null) {
+    return;
+  }
+
+  ref.read(inventoryControllerProvider.notifier).addItem(
+        name: result.name,
+        category: result.category,
+        condition: result.condition,
+        siteId: result.siteId,
+        processedBy: _defaultManagerId,
+      );
+}
+
+class _AddItemInput {
+  const _AddItemInput({
+    required this.name,
+    required this.category,
+    required this.condition,
+    required this.siteId,
+  });
+
+  final String name;
+  final ItemCategory category;
+  final ItemCondition condition;
+  final String siteId;
+}
+
 class InventoryState {
   const InventoryState({
     required this.users,
@@ -597,6 +909,7 @@ class InventoryState {
     this.searchQuery = '',
     this.categoryFilter,
     this.conditionFilter,
+    this.siteFilter,
   });
 
   static const Object _unset = Object();
@@ -607,6 +920,7 @@ class InventoryState {
   final String searchQuery;
   final ItemCategory? categoryFilter;
   final ItemCondition? conditionFilter;
+  final String? siteFilter;
 
   factory InventoryState.initial() {
     final now = DateTime.now();
@@ -710,6 +1024,15 @@ class InventoryState {
       .where((user) => user.role == UserRole.worker)
       .toList(growable: false);
 
+  List<String> get siteIds {
+    final sites = {
+      ..._knownSiteIds,
+      ...items.map((item) => item.siteId),
+    }.toList(growable: false);
+    sites.sort();
+    return sites;
+  }
+
   int get totalItems => items.length;
 
   int get availableItems =>
@@ -737,8 +1060,9 @@ class InventoryState {
           categoryFilter == null || item.category == categoryFilter;
       final matchCondition =
           conditionFilter == null || item.condition == conditionFilter;
+      final matchSite = siteFilter == null || item.siteId == siteFilter;
 
-      return matchSearch && matchCategory && matchCondition;
+      return matchSearch && matchCategory && matchCondition && matchSite;
     }).toList(growable: false);
   }
 
@@ -749,6 +1073,7 @@ class InventoryState {
     String? searchQuery,
     Object? categoryFilter = _unset,
     Object? conditionFilter = _unset,
+    Object? siteFilter = _unset,
   }) {
     return InventoryState(
       users: users ?? this.users,
@@ -761,6 +1086,9 @@ class InventoryState {
       conditionFilter: identical(conditionFilter, _unset)
           ? this.conditionFilter
           : conditionFilter as ItemCondition?,
+      siteFilter: identical(siteFilter, _unset)
+          ? this.siteFilter
+          : siteFilter as String?,
     );
   }
 }
@@ -780,6 +1108,10 @@ class InventoryController extends StateNotifier<InventoryState> {
 
   void updateConditionFilter(ItemCondition? value) {
     state = state.copyWith(conditionFilter: value);
+  }
+
+  void updateSiteFilter(String? value) {
+    state = state.copyWith(siteFilter: value);
   }
 
   void checkOutItem({
@@ -863,6 +1195,81 @@ class InventoryController extends StateNotifier<InventoryState> {
       transactions: [transaction, ...state.transactions],
     );
   }
+
+  void transferItem({
+    required String itemId,
+    required String targetSiteId,
+    required String processedBy,
+  }) {
+    final index = state.items.indexWhere((item) => item.id == itemId);
+    if (index < 0) {
+      return;
+    }
+
+    final item = state.items[index];
+    if (item.holderId != null || item.siteId == targetSiteId) {
+      return;
+    }
+
+    final updatedItems = List<InventoryItem>.from(state.items);
+    updatedItems[index] = InventoryItem(
+      id: item.id,
+      name: item.name,
+      siteId: targetSiteId,
+      category: item.category,
+      condition: item.condition,
+    );
+
+    final transaction = InventoryTransaction(
+      id: _uuid.v4(),
+      itemId: item.id,
+      type: TransactionType.transfer,
+      status: TransactionStatus.completed,
+      timestamp: DateTime.now(),
+      userId: processedBy,
+      sourceSiteId: item.siteId,
+      targetSiteId: targetSiteId,
+      condition: item.condition,
+    );
+
+    state = state.copyWith(
+      items: updatedItems,
+      transactions: [transaction, ...state.transactions],
+    );
+  }
+
+  void addItem({
+    required String name,
+    required ItemCategory category,
+    required ItemCondition condition,
+    required String siteId,
+    required String processedBy,
+  }) {
+    final itemId = 'itm-${_uuid.v4().substring(0, 8)}';
+    final item = InventoryItem(
+      id: itemId,
+      name: name,
+      siteId: siteId,
+      category: category,
+      condition: condition,
+    );
+
+    final transaction = InventoryTransaction(
+      id: _uuid.v4(),
+      itemId: itemId,
+      type: TransactionType.checkIn,
+      status: TransactionStatus.completed,
+      timestamp: DateTime.now(),
+      userId: processedBy,
+      targetSiteId: siteId,
+      condition: condition,
+    );
+
+    state = state.copyWith(
+      items: [item, ...state.items],
+      transactions: [transaction, ...state.transactions],
+    );
+  }
 }
 
 String _categoryLabel(ItemCategory category) {
@@ -900,6 +1307,21 @@ String _siteLabel(String siteId) {
     default:
       return siteId;
   }
+}
+
+String? _transactionDetails(InventoryTransaction transaction) {
+  if (transaction.type == TransactionType.transfer &&
+      transaction.sourceSiteId != null &&
+      transaction.targetSiteId != null) {
+    return '${_siteLabel(transaction.sourceSiteId!)} -> ${_siteLabel(transaction.targetSiteId!)}';
+  }
+
+  if (transaction.type == TransactionType.checkIn &&
+      transaction.targetSiteId != null) {
+    return 'Added to ${_siteLabel(transaction.targetSiteId!)}';
+  }
+
+  return null;
 }
 
 String _transactionLabel(TransactionType type) {

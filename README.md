@@ -7,6 +7,8 @@ Flutter MVP for construction inventory tracking.
 - Inventory dashboard with search and filters.
 - KPI cards for total, available, checked out, and service-needed items.
 - Check-out and return flows with condition update.
+- Transfer flow between construction sites.
+- Add item flow directly from the inventory screen.
 - Operations log with timestamps and operation type icons.
 - Safe startup without `firebase_options.dart`:
   the app falls back to local mode if Firebase is not configured.

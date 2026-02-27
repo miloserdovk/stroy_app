@@ -88,6 +88,8 @@ class InventoryTransaction {
   final DateTime timestamp;
   final String userId;
   final String? targetUserId;
+  final String? sourceSiteId;
+  final String? targetSiteId;
   final ItemCondition condition;
 
   InventoryTransaction({
@@ -97,6 +99,8 @@ class InventoryTransaction {
     required this.timestamp,
     required this.userId,
     this.targetUserId,
+    this.sourceSiteId,
+    this.targetSiteId,
     this.status = TransactionStatus.completed,
     this.condition = ItemCondition.good,
   });
@@ -108,6 +112,8 @@ class InventoryTransaction {
         'timestamp': Timestamp.fromDate(timestamp),
         'userId': userId,
         'targetUserId': targetUserId,
+        'sourceSiteId': sourceSiteId,
+        'targetSiteId': targetSiteId,
         'condition': condition.name,
       };
 
@@ -120,6 +126,8 @@ class InventoryTransaction {
       timestamp: (json['timestamp'] as Timestamp).toDate(),
       userId: json['userId'],
       targetUserId: json['targetUserId'],
+      sourceSiteId: json['sourceSiteId'],
+      targetSiteId: json['targetSiteId'],
       condition: ItemCondition.values.firstWhere((e) => e.name == json['condition']),
     );
   }
