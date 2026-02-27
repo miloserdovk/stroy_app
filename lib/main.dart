@@ -54,7 +54,7 @@ class _MyAppState extends State<MyApp> {
         theme: ThemeData(
           useMaterial3: true,
           colorSchemeSeed: Colors.orange,
-          cardTheme: const CardTheme(
+          cardTheme: const CardThemeData(
             elevation: 0,
             margin: EdgeInsets.zero,
           ),
@@ -178,7 +178,8 @@ class InventoryTab extends ConsumerWidget {
                   SizedBox(
                     width: fieldWidth,
                     child: DropdownButtonFormField<ItemCategory?>(
-                      value: state.categoryFilter,
+                      isExpanded: true,
+                      initialValue: state.categoryFilter,
                       decoration: const InputDecoration(
                         labelText: 'Category',
                         border: OutlineInputBorder(),
@@ -201,7 +202,8 @@ class InventoryTab extends ConsumerWidget {
                   SizedBox(
                     width: fieldWidth,
                     child: DropdownButtonFormField<ItemCondition?>(
-                      value: state.conditionFilter,
+                      isExpanded: true,
+                      initialValue: state.conditionFilter,
                       decoration: const InputDecoration(
                         labelText: 'Condition',
                         border: OutlineInputBorder(),
@@ -224,7 +226,8 @@ class InventoryTab extends ConsumerWidget {
                   SizedBox(
                     width: fieldWidth,
                     child: DropdownButtonFormField<String?>(
-                      value: state.siteFilter,
+                      isExpanded: true,
+                      initialValue: state.siteFilter,
                       decoration: const InputDecoration(
                         labelText: 'Site',
                         border: OutlineInputBorder(),
@@ -514,8 +517,8 @@ class StatusChip extends StatelessWidget {
 
     return Chip(
       label: Text(text),
-      side: BorderSide(color: color.withOpacity(0.3)),
-      backgroundColor: color.withOpacity(0.1),
+      side: BorderSide(color: color.withValues(alpha: 0.3)),
+      backgroundColor: color.withValues(alpha: 0.1),
       labelStyle: TextStyle(color: color.shade700),
       visualDensity: VisualDensity.compact,
     );
@@ -547,7 +550,8 @@ class TransactionsTab extends ConsumerWidget {
       child: Column(
         children: [
           DropdownButtonFormField<TransactionType?>(
-            value: state.transactionTypeFilter,
+            isExpanded: true,
+            initialValue: state.transactionTypeFilter,
             decoration: const InputDecoration(
               labelText: 'Operation type',
               border: OutlineInputBorder(),
@@ -626,7 +630,8 @@ Future<void> _showCheckoutDialog({
           return AlertDialog(
             title: Text('Check out: ${item.name}'),
             content: DropdownButtonFormField<String>(
-              value: selectedWorkerId,
+              isExpanded: true,
+              initialValue: selectedWorkerId,
               decoration: const InputDecoration(
                 labelText: 'Worker',
                 border: OutlineInputBorder(),
@@ -688,7 +693,8 @@ Future<void> _showReturnDialog({
           return AlertDialog(
             title: Text('Return: ${item.name}'),
             content: DropdownButtonFormField<ItemCondition>(
-              value: selectedCondition,
+              isExpanded: true,
+              initialValue: selectedCondition,
               decoration: const InputDecoration(
                 labelText: 'Condition',
                 border: OutlineInputBorder(),
@@ -758,7 +764,8 @@ Future<void> _showTransferDialog({
           return AlertDialog(
             title: Text('Transfer: ${item.name}'),
             content: DropdownButtonFormField<String>(
-              value: selectedSiteId,
+              isExpanded: true,
+              initialValue: selectedSiteId,
               decoration: const InputDecoration(
                 labelText: 'Target site',
                 border: OutlineInputBorder(),
@@ -843,7 +850,8 @@ Future<void> _showAddItemDialog({
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<ItemCategory>(
-                      value: selectedCategory,
+                      isExpanded: true,
+                      initialValue: selectedCategory,
                       decoration: const InputDecoration(
                         labelText: 'Category',
                         border: OutlineInputBorder(),
@@ -866,7 +874,8 @@ Future<void> _showAddItemDialog({
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<ItemCondition>(
-                      value: selectedCondition,
+                      isExpanded: true,
+                      initialValue: selectedCondition,
                       decoration: const InputDecoration(
                         labelText: 'Condition',
                         border: OutlineInputBorder(),
@@ -889,7 +898,8 @@ Future<void> _showAddItemDialog({
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedSiteId,
+                      isExpanded: true,
+                      initialValue: selectedSiteId,
                       decoration: const InputDecoration(
                         labelText: 'Site',
                         border: OutlineInputBorder(),
@@ -1001,7 +1011,8 @@ Future<void> _showEditItemDialog({
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<ItemCategory>(
-                      value: selectedCategory,
+                      isExpanded: true,
+                      initialValue: selectedCategory,
                       decoration: const InputDecoration(
                         labelText: 'Category',
                         border: OutlineInputBorder(),
@@ -1024,7 +1035,8 @@ Future<void> _showEditItemDialog({
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<ItemCondition>(
-                      value: selectedCondition,
+                      isExpanded: true,
+                      initialValue: selectedCondition,
                       decoration: const InputDecoration(
                         labelText: 'Condition',
                         border: OutlineInputBorder(),
@@ -1047,7 +1059,8 @@ Future<void> _showEditItemDialog({
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedSiteId,
+                      isExpanded: true,
+                      initialValue: selectedSiteId,
                       decoration: const InputDecoration(
                         labelText: 'Site',
                         border: OutlineInputBorder(),
