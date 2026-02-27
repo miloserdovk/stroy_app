@@ -10,6 +10,7 @@ import 'models.dart';
 
 const String _defaultManagerId = 'u-manager-1';
 const List<String> _knownSiteIds = ['wh-a', 'site-17', 'site-19'];
+enum _InventoryItemMenuAction { edit, delete }
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -299,6 +300,41 @@ class InventoryTab extends ConsumerWidget {
                                     ),
                                   ),
                                   StatusChip(isAssigned: item.holderId != null),
+                                  PopupMenuButton<_InventoryItemMenuAction>(
+                                    onSelected: (action) {
+                                      switch (action) {
+                                        case _InventoryItemMenuAction.edit:
+                                          _showEditItemDialog(
+                                            context: context,
+                                            ref: ref,
+                                            item: item,
+                                            siteIds: state.siteIds,
+                                          );
+                                          break;
+                                        case _InventoryItemMenuAction.delete:
+                                          _showDeleteItemDialog(
+                                            context: context,
+                                            ref: ref,
+                                            item: item,
+                                          );
+                                          break;
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem<
+                                          _InventoryItemMenuAction>(
+                                        value: _InventoryItemMenuAction.edit,
+                                        child: Text('Edit'),
+                                      ),
+                                      if (item.holderId == null)
+                                        const PopupMenuItem<
+                                            _InventoryItemMenuAction>(
+                                          value:
+                                              _InventoryItemMenuAction.delete,
+                                          child: Text('Delete'),
+                                        ),
+                                    ],
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 8),
@@ -492,6 +528,7 @@ class TransactionsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(inventoryControllerProvider);
+    final notifier = ref.read(inventoryControllerProvider.notifier);
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
     final itemById = <String, InventoryItem>{
       for (final item in state.items) item.id: item,
@@ -503,34 +540,72 @@ class TransactionsTab extends ConsumerWidget {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: state.transactions.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final transaction = state.transactions[index];
-        final itemName = itemById[transaction.itemId]?.name ?? transaction.itemId;
-        final actorName = state.usersById[transaction.userId]?.name ??
-            transaction.userId;
-        final details = _transactionDetails(transaction);
+    final transactions = state.filteredTransactions;
 
-        return Card(
-          child: ListTile(
-            leading: Icon(
-              _transactionIcon(transaction.type),
-              color: _transactionColor(transaction.type),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          DropdownButtonFormField<TransactionType?>(
+            value: state.transactionTypeFilter,
+            decoration: const InputDecoration(
+              labelText: 'Operation type',
+              border: OutlineInputBorder(),
             ),
-            title: Text('${_transactionLabel(transaction.type)}: $itemName'),
-            subtitle: Text(
-              details == null
-                  ? '$actorName | ${dateFormat.format(transaction.timestamp)}'
-                  : '$actorName | ${dateFormat.format(transaction.timestamp)}\n$details',
-            ),
-            isThreeLine: details != null,
-            trailing: Text(_conditionLabel(transaction.condition)),
+            items: [
+              const DropdownMenuItem<TransactionType?>(
+                value: null,
+                child: Text('All operations'),
+              ),
+              ...TransactionType.values.map(
+                (type) => DropdownMenuItem<TransactionType?>(
+                  value: type,
+                  child: Text(_transactionLabel(type)),
+                ),
+              ),
+            ],
+            onChanged: notifier.updateTransactionTypeFilter,
           ),
-        );
-      },
+          const SizedBox(height: 12),
+          Expanded(
+            child: transactions.isEmpty
+                ? const Center(
+                    child: Text('No operations found for selected filter.'),
+                  )
+                : ListView.separated(
+                    itemCount: transactions.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final transaction = transactions[index];
+                      final itemName =
+                          itemById[transaction.itemId]?.name ?? transaction.itemId;
+                      final actorName = state.usersById[transaction.userId]?.name ??
+                          transaction.userId;
+                      final details = _transactionDetails(transaction);
+
+                      return Card(
+                        child: ListTile(
+                          leading: Icon(
+                            _transactionIcon(transaction.type),
+                            color: _transactionColor(transaction.type),
+                          ),
+                          title:
+                              Text('${_transactionLabel(transaction.type)}: $itemName'),
+                          subtitle: Text(
+                            details == null
+                                ? '$actorName | ${dateFormat.format(transaction.timestamp)}'
+                                : '$actorName | ${dateFormat.format(transaction.timestamp)}\n$details',
+                          ),
+                          isThreeLine: details != null,
+                          trailing: Text(_conditionLabel(transaction.condition)),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -887,8 +962,225 @@ Future<void> _showAddItemDialog({
       );
 }
 
+Future<void> _showEditItemDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  required InventoryItem item,
+  required List<String> siteIds,
+}) async {
+  final nameController = TextEditingController(text: item.name);
+  var selectedCategory = item.category;
+  var selectedCondition = item.condition;
+  var selectedSiteId = item.siteId;
+  var shouldShowValidation = false;
+  final canChangeSite = item.holderId == null;
+
+  final result = await showDialog<_EditItemInput>(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Text('Edit item: ${item.id}'),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: 'Name',
+                        border: const OutlineInputBorder(),
+                        errorText: shouldShowValidation &&
+                                nameController.text.trim().isEmpty
+                            ? 'Name is required'
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<ItemCategory>(
+                      value: selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: ItemCategory.values
+                          .map(
+                            (category) => DropdownMenuItem<ItemCategory>(
+                              value: category,
+                              child: Text(_categoryLabel(category)),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedCategory = value;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<ItemCondition>(
+                      value: selectedCondition,
+                      decoration: const InputDecoration(
+                        labelText: 'Condition',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: ItemCondition.values
+                          .map(
+                            (condition) => DropdownMenuItem<ItemCondition>(
+                              value: condition,
+                              child: Text(_conditionLabel(condition)),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedCondition = value;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedSiteId,
+                      decoration: const InputDecoration(
+                        labelText: 'Site',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: siteIds
+                          .map(
+                            (siteId) => DropdownMenuItem<String>(
+                              value: siteId,
+                              child: Text(_siteLabel(siteId)),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: canChangeSite
+                          ? (value) {
+                              if (value != null) {
+                                setState(() {
+                                  selectedSiteId = value;
+                                });
+                              }
+                            }
+                          : null,
+                    ),
+                    if (!canChangeSite)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Site cannot be changed while item is assigned.',
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final itemName = nameController.text.trim();
+                  if (itemName.isEmpty) {
+                    setState(() {
+                      shouldShowValidation = true;
+                    });
+                    return;
+                  }
+
+                  Navigator.of(context).pop(
+                    _EditItemInput(
+                      name: itemName,
+                      category: selectedCategory,
+                      condition: selectedCondition,
+                      siteId: selectedSiteId,
+                    ),
+                  );
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  nameController.dispose();
+
+  if (result == null) {
+    return;
+  }
+
+  ref.read(inventoryControllerProvider.notifier).editItem(
+        itemId: item.id,
+        name: result.name,
+        category: result.category,
+        condition: result.condition,
+        siteId: result.siteId,
+        processedBy: _defaultManagerId,
+      );
+}
+
+Future<void> _showDeleteItemDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  required InventoryItem item,
+}) async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Delete item'),
+        content: Text('Delete "${item.name}" (${item.id})?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (confirm != true) {
+    return;
+  }
+
+  ref.read(inventoryControllerProvider.notifier).deleteItem(itemId: item.id);
+}
+
 class _AddItemInput {
   const _AddItemInput({
+    required this.name,
+    required this.category,
+    required this.condition,
+    required this.siteId,
+  });
+
+  final String name;
+  final ItemCategory category;
+  final ItemCondition condition;
+  final String siteId;
+}
+
+class _EditItemInput {
+  const _EditItemInput({
     required this.name,
     required this.category,
     required this.condition,
@@ -910,6 +1202,7 @@ class InventoryState {
     this.categoryFilter,
     this.conditionFilter,
     this.siteFilter,
+    this.transactionTypeFilter,
   });
 
   static const Object _unset = Object();
@@ -921,6 +1214,7 @@ class InventoryState {
   final ItemCategory? categoryFilter;
   final ItemCondition? conditionFilter;
   final String? siteFilter;
+  final TransactionType? transactionTypeFilter;
 
   factory InventoryState.initial() {
     final now = DateTime.now();
@@ -1066,6 +1360,16 @@ class InventoryState {
     }).toList(growable: false);
   }
 
+  List<InventoryTransaction> get filteredTransactions {
+    if (transactionTypeFilter == null) {
+      return transactions;
+    }
+
+    return transactions
+        .where((transaction) => transaction.type == transactionTypeFilter)
+        .toList(growable: false);
+  }
+
   InventoryState copyWith({
     List<AppUser>? users,
     List<InventoryItem>? items,
@@ -1074,6 +1378,7 @@ class InventoryState {
     Object? categoryFilter = _unset,
     Object? conditionFilter = _unset,
     Object? siteFilter = _unset,
+    Object? transactionTypeFilter = _unset,
   }) {
     return InventoryState(
       users: users ?? this.users,
@@ -1089,6 +1394,9 @@ class InventoryState {
       siteFilter: identical(siteFilter, _unset)
           ? this.siteFilter
           : siteFilter as String?,
+      transactionTypeFilter: identical(transactionTypeFilter, _unset)
+          ? this.transactionTypeFilter
+          : transactionTypeFilter as TransactionType?,
     );
   }
 }
@@ -1112,6 +1420,10 @@ class InventoryController extends StateNotifier<InventoryState> {
 
   void updateSiteFilter(String? value) {
     state = state.copyWith(siteFilter: value);
+  }
+
+  void updateTransactionTypeFilter(TransactionType? value) {
+    state = state.copyWith(transactionTypeFilter: value);
   }
 
   void checkOutItem({
@@ -1269,6 +1581,75 @@ class InventoryController extends StateNotifier<InventoryState> {
       items: [item, ...state.items],
       transactions: [transaction, ...state.transactions],
     );
+  }
+
+  void editItem({
+    required String itemId,
+    required String name,
+    required ItemCategory category,
+    required ItemCondition condition,
+    required String siteId,
+    required String processedBy,
+  }) {
+    final index = state.items.indexWhere((item) => item.id == itemId);
+    if (index < 0) {
+      return;
+    }
+
+    final item = state.items[index];
+    if (item.holderId != null && item.siteId != siteId) {
+      return;
+    }
+
+    final updatedItems = List<InventoryItem>.from(state.items);
+    updatedItems[index] = InventoryItem(
+      id: item.id,
+      name: name,
+      siteId: siteId,
+      holderId: item.holderId,
+      category: category,
+      condition: condition,
+    );
+
+    final updatedTransactions = List<InventoryTransaction>.from(state.transactions);
+    if (item.siteId != siteId) {
+      updatedTransactions.insert(
+        0,
+        InventoryTransaction(
+          id: _uuid.v4(),
+          itemId: item.id,
+          type: TransactionType.transfer,
+          status: TransactionStatus.completed,
+          timestamp: DateTime.now(),
+          userId: processedBy,
+          sourceSiteId: item.siteId,
+          targetSiteId: siteId,
+          condition: condition,
+        ),
+      );
+    }
+
+    state = state.copyWith(
+      items: updatedItems,
+      transactions: updatedTransactions,
+    );
+  }
+
+  void deleteItem({
+    required String itemId,
+  }) {
+    final index = state.items.indexWhere((item) => item.id == itemId);
+    if (index < 0) {
+      return;
+    }
+
+    final item = state.items[index];
+    if (item.holderId != null) {
+      return;
+    }
+
+    final updatedItems = List<InventoryItem>.from(state.items)..removeAt(index);
+    state = state.copyWith(items: updatedItems);
   }
 }
 

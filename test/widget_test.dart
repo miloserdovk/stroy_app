@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stroy_app/main.dart';
 
@@ -10,6 +11,7 @@ void main() {
     expect(find.text('Inventory'), findsOneWidget);
     expect(find.text('Log'), findsOneWidget);
     expect(find.text('Add item'), findsOneWidget);
+    expect(find.byIcon(Icons.more_vert), findsWidgets);
     expect(find.text('Hammer Drill Makita HR2470'), findsOneWidget);
   });
 }
